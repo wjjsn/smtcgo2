@@ -54,12 +54,12 @@ std::tuple<Point, Point>* check_roadblock(const uint8_t* binary_img, int width, 
     int w = width;
 
     // 解析起始点（与 Python 的 x_left, y_left, x_right, y_right 一致）
-    Point 左起点 = std::get<0>(*start_point);
-    Point 右起点 = std::get<1>(*start_point);
-    int x_left = 左起点.x;
-    int y_left = 左起点.y;
-    int x_right = 右起点.x;
-    int y_right = 右起点.y;
+    Point left_start_point = std::get<0>(*start_point); // 原变量名: 左起点
+    Point right_start_point = std::get<1>(*start_point); // 原变量名: 右起点
+    int x_left = left_start_point.x;
+    int y_left = left_start_point.y;
+    int x_right = right_start_point.x;
+    int y_right = right_start_point.y;
 
     // ==================== 1. 图像反转 ====================
     // Python: inverted_img = cv2.bitwise_not(binary_img)
@@ -142,15 +142,15 @@ std::tuple<Point, Point>* check_roadblock(const uint8_t* binary_img, int width, 
             }
         }
 
-        Point 黑块右下角点(max_x_at_max_y, max_y);
+        Point block_bottom_right_point(max_x_at_max_y, max_y); // 原变量名: 黑块右下角点
 
         // 障碍物中心必须在图像下半部分（与 Python 一致）
-        if (黑块右下角点.y < h / 2) {
+        if (block_bottom_right_point.y < h / 2) {
             return nullptr;
         }
 
         // 返回避障引导线：左起点 -> 黑块右下角点
-        roadblock_result_buffer = std::make_tuple(左起点, 黑块右下角点);
+        roadblock_result_buffer = std::make_tuple(left_start_point, block_bottom_right_point);
         return &roadblock_result_buffer;
     }
 
@@ -173,14 +173,14 @@ std::tuple<Point, Point>* check_roadblock(const uint8_t* binary_img, int width, 
             }
         }
 
-        Point 黑块左下角点(min_x_at_max_y, max_y);
+        Point block_bottom_left_point(min_x_at_max_y, max_y); // 原变量名: 黑块左下角点
 
-        if (黑块左下角点.y < h / 2) {
+        if (block_bottom_left_point.y < h / 2) {
             return nullptr;
         }
 
         // 返回避障引导线：右起点 -> 黑块左下角点
-        roadblock_result_buffer = std::make_tuple(右起点, 黑块左下角点);
+        roadblock_result_buffer = std::make_tuple(right_start_point, block_bottom_left_point);
         return &roadblock_result_buffer;
     }
 
