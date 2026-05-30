@@ -111,9 +111,9 @@ std::tuple<Point, Point>* prepare_enter_ring(const uint8_t* bin_img, int width, 
             Point curr_center((lp_curr.x + rp_curr.x) / 2, (lp_curr.y + rp_curr.y) / 2);
 
 #ifdef SMTC2GO_DEBUG
-            printf("线长变化：%d\n", curr_width - prev_width);
-            printf("突变前中点: (%d, %d), 突变后中点: (%d, %d)\n",
-                   prev_center.x, prev_center.y, curr_center.x, curr_center.y);
+            LOG_DEBUG("线长变化：%d", curr_width - prev_width);
+            LOG_DEBUG("突变前中点: (%d, %d), 突变后中点: (%d, %d)",
+                      prev_center.x, prev_center.y, curr_center.x, curr_center.y);
 #endif
 
             // 根据中心点偏移方向判断左右
@@ -123,7 +123,7 @@ std::tuple<Point, Point>* prepare_enter_ring(const uint8_t* bin_img, int width, 
                     return &line_length_points_buffer[i - 1];
                 } else {
 #ifdef SMTC2GO_DEBUG
-                    printf("实际检测到的圆坏类型是左，不是% d\n", static_cast<int>(ss->ring_type));
+                    LOG_WARN("实际检测到的圆坏类型是左，不是%d", static_cast<int>(ss->ring_type));
 #endif
                     return &line_length_points_buffer[i - 1];
                 }
@@ -133,13 +133,13 @@ std::tuple<Point, Point>* prepare_enter_ring(const uint8_t* bin_img, int width, 
                     return &line_length_points_buffer[i - 1];
                 } else {
 #ifdef SMTC2GO_DEBUG
-                    printf("实际检测到的圆坏类型是右，不是%d\n", static_cast<int>(ss->ring_type));
+                    LOG_WARN("实际检测到的圆坏类型是右，不是%d", static_cast<int>(ss->ring_type));
 #endif
                     return &line_length_points_buffer[i - 1];
                 }
             } else {
 #ifdef SMTC2GO_DEBUG
-                printf("突变过小，可能是十字\n");
+                LOG_DEBUG("突变过小，可能是十字");
 #endif
                 return nullptr;
             }
@@ -147,7 +147,7 @@ std::tuple<Point, Point>* prepare_enter_ring(const uint8_t* bin_img, int width, 
     }
 
 #ifdef SMTC2GO_DEBUG
-    printf("线长变化不满足跳变阈值\n");
+    LOG_DEBUG("线长变化不满足跳变阈值");
 #endif
     return nullptr;
 }
@@ -197,9 +197,9 @@ std::tuple<Point, Point>* prepare_exit_ring(const uint8_t* bin_img, int width, i
             Point curr_center((lp_curr.x + rp_curr.x) / 2, (lp_curr.y + rp_curr.y) / 2);
 
 #ifdef SMTC2GO_DEBUG
-            printf("线长变化：%d\n", curr_width - prev_width);
-            printf("突变前中点: (%d, %d), 突变后中点: (%d, %d)\n",
-                   prev_center.x, prev_center.y, curr_center.x, curr_center.y);
+            LOG_DEBUG("线长变化：%d", curr_width - prev_width);
+            LOG_DEBUG("突变前中点: (%d, %d), 突变后中点: (%d, %d)",
+                      prev_center.x, prev_center.y, curr_center.x, curr_center.y);
 
             cv::Mat debug_img(height, width, CV_8UC1, const_cast<uint8_t*>(bin_img));
             cv::line(debug_img, cv::Point(prev_center.x, prev_center.y),
@@ -217,7 +217,7 @@ std::tuple<Point, Point>* prepare_exit_ring(const uint8_t* bin_img, int width, i
                     return &line_length_points_buffer[i];
                 } else {
 #ifdef SMTC2GO_DEBUG
-                    printf("实际检测到的圆坏类型是右，不是%d\n", static_cast<int>(ss->ring_type));
+                    LOG_WARN("实际检测到的圆坏类型是右，不是%d", static_cast<int>(ss->ring_type));
 #endif
                     return &line_length_points_buffer[i];
                 }
@@ -227,13 +227,13 @@ std::tuple<Point, Point>* prepare_exit_ring(const uint8_t* bin_img, int width, i
                     return &line_length_points_buffer[i];
                 } else {
 #ifdef SMTC2GO_DEBUG
-                    printf("实际检测到的圆坏类型是左，不是%d\n", static_cast<int>(ss->ring_type));
+                    LOG_WARN("实际检测到的圆坏类型是左，不是%d", static_cast<int>(ss->ring_type));
 #endif
                     return &line_length_points_buffer[i];
                 }
             } else {
 #ifdef SMTC2GO_DEBUG
-                printf("突变过小，可能是十字\n");
+                LOG_DEBUG("突变过小，可能是十字");
 #endif
                 return nullptr;
             }

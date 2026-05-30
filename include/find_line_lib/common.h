@@ -1,6 +1,40 @@
 #pragma once
 
 #include <cstdint>
+#include <cstdio>
+#include <cstdarg>
+
+// ==================== 调试日志宏 ====================
+// SMTC2GO_DEBUG_LOG: 结构化日志，启用时输出到 stderr，不启用时零开销
+#ifdef SMTC2GO_DEBUG_LOG
+enum class LogLevel { Debug, Info, Warn, Error };
+
+inline const char* short_file(const char* path) {
+    const char* p = path;
+    while (*path) { if (*path == '/' || *path == '\\') p = path + 1; ++path; }
+    return p;
+}
+
+inline void log_message(LogLevel level, const char* file, int line, const char* fmt, ...) {
+    static const char* level_names[] = {"DEBUG", "INFO", "WARN", "ERROR"};
+    fprintf(stderr, "[%s] %s:%d: ", level_names[static_cast<int>(level)], short_file(file), line);
+    va_list args;
+    va_start(args, fmt);
+    vfprintf(stderr, fmt, args);
+    va_end(args);
+    fprintf(stderr, "\n");
+}
+
+#define LOG_DEBUG(fmt, ...) log_message(LogLevel::Debug, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+#define LOG_INFO(fmt, ...)  log_message(LogLevel::Info,  __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+#define LOG_WARN(fmt, ...)  log_message(LogLevel::Warn,  __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+#define LOG_ERROR(fmt, ...) log_message(LogLevel::Error, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+#else
+#define LOG_DEBUG(fmt, ...)
+#define LOG_INFO(fmt, ...)
+#define LOG_WARN(fmt, ...)
+#define LOG_ERROR(fmt, ...)
+#endif
 
 constexpr int IMAGE_H_MAX = 480;
 constexpr int IMAGE_W_MAX = 640;

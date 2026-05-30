@@ -25,7 +25,10 @@ target_compile_definitions(find_line_lib
     PRIVATE   # 仅当前目标
     #INTERFACE # 仅依赖者
     #PUBLIC    # 当前目标和依赖者
-    -DSMTC2GO_DEBUG
+    -DSMTC2GO_DEBUG #所有调试宏开关，这个启用，下面的才生效
+    -DSMTC2GO_DEBUG_IMSHOW # 显示图像
+    -DSMTC2GO_DEBUG_LOG # 日志输出
+    -DSMTC2GO_DEBUG_TRACE_PERFORMANCE # 性能跟踪
 )
 
 target_include_directories(find_line_lib

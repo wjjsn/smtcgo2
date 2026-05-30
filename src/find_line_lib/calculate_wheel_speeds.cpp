@@ -543,10 +543,8 @@ std::tuple<float, float> calculate_wheel_speeds(const cv::Mat& image, float base
                         s_ring_status = RingStatus::Discovered;
                         s_ring_type = (ring_result.ring_side == 'l') ? RingType::Left : RingType::Right;
                         s_ring_detect_count = 0;
-#ifdef SMTC2GO_DEBUG
-                        printf("[帧 %d] 未发现 -> 已发现 (%s圆环)\n", frame_number,
-                               s_ring_type == RingType::Left ? "左" : "右");
-#endif
+                        LOG_INFO("[帧 %d] 未发现 -> 已发现 (%s圆环)", frame_number,
+                                 s_ring_type == RingType::Left ? "左" : "右");
                     }
                 } else { s_ring_detect_count = 0; }
                 break;
@@ -557,9 +555,7 @@ std::tuple<float, float> calculate_wheel_speeds(const cv::Mat& image, float base
                     if (s_ring_disappear_count >= confirm_threshold) {
                         s_ring_status = RingStatus::PrepareEnter;
                         s_ring_disappear_count = 0;
-#ifdef SMTC2GO_DEBUG
-                        printf("[帧 %d] 已发现 -> 准备入环\n", frame_number);
-#endif
+                        LOG_INFO("[帧 %d] 已发现 -> 准备入环", frame_number);
                     }
                 } else {
                     s_ring_disappear_count = 0;
@@ -572,9 +568,7 @@ std::tuple<float, float> calculate_wheel_speeds(const cv::Mat& image, float base
                     if (s_single_path_count >= confirm_threshold) {
                         s_ring_status = RingStatus::PrepareExit;
                         s_single_path_count = 0;
-#ifdef SMTC2GO_DEBUG
-                        printf("[帧 %d] 准备入环 -> 准备出环\n", frame_number);
-#endif
+                        LOG_INFO("[帧 %d] 准备入环 -> 准备出环", frame_number);
                     }
                 } else { s_single_path_count = 0; }
                 break;
@@ -584,9 +578,7 @@ std::tuple<float, float> calculate_wheel_speeds(const cv::Mat& image, float base
                     if (s_dual_path_count >= confirm_threshold) {
                         s_ring_status = RingStatus::AboutToExit;
                         s_dual_path_count = 0;
-#ifdef SMTC2GO_DEBUG
-                        printf("[帧 %d] 准备出环 -> 即将出环\n", frame_number);
-#endif
+                        LOG_INFO("[帧 %d] 准备出环 -> 即将出环", frame_number);
                     }
                 } else { s_dual_path_count = 0; }
                 break;
@@ -597,9 +589,7 @@ std::tuple<float, float> calculate_wheel_speeds(const cv::Mat& image, float base
                         s_ring_status = RingStatus::Exiting;
                         s_ring_type = RingType::None;
                         s_single_path_count = 0;
-#ifdef SMTC2GO_DEBUG
-                        printf("[帧 %d] 即将出环 -> 出环中\n", frame_number);
-#endif
+                        LOG_INFO("[帧 %d] 即将出环 -> 出环中", frame_number);
                     }
                 } else { s_single_path_count = 0; }
                 break;
@@ -610,9 +600,7 @@ std::tuple<float, float> calculate_wheel_speeds(const cv::Mat& image, float base
                         s_ring_status = RingStatus::NotFound;
                         s_ring_type = RingType::None;
                         s_single_path_count = 0;
-#ifdef SMTC2GO_DEBUG
-                        printf("[帧 %d] 出环中 -> 未发现\n", frame_number);
-#endif
+                        LOG_INFO("[帧 %d] 出环中 -> 未发现", frame_number);
                     }
                 } else { s_single_path_count = 0; }
                 break;
@@ -620,9 +608,9 @@ std::tuple<float, float> calculate_wheel_speeds(const cv::Mat& image, float base
 
 #ifdef SMTC2GO_DEBUG
         if (frame_number % 20 == 0) {
-            printf("[帧 %d] 状态=%s 圆坏类型=%s 分支=%d 端点=%d 有环=%d 环位置=%d\n",
-                   frame_number, ring_status_name(s_ring_status), ring_type_name(s_ring_type),
-                   branch_count, endpoint_count, has_ring ? 1 : 0, ring_result.ring_center_x);
+            LOG_DEBUG("[帧 %d] 状态=%s 圆坏类型=%s 分支=%d 端点=%d 有环=%d 环位置=%d",
+                      frame_number, ring_status_name(s_ring_status), ring_type_name(s_ring_type),
+                      branch_count, endpoint_count, has_ring ? 1 : 0, ring_result.ring_center_x);
         }
         if (frame_number % 10 == 0) {
             save_debug_images(ring_status_name(s_ring_status), frame_number,
@@ -651,9 +639,7 @@ std::tuple<float, float> calculate_wheel_speeds(const cv::Mat& image, float base
                 if (s_ring_disappear_count >= confirm_threshold) {
                     s_ring_status = RingStatus::PrepareEnter;
                     s_ring_disappear_count = 0;
-#ifdef SMTC2GO_DEBUG
-                    printf("[帧 %d] 已发现 -> 准备入环\n", frame_number);
-#endif
+                    LOG_INFO("[帧 %d] 已发现 -> 准备入环", frame_number);
                 }
                 break;
             case RingStatus::PrepareEnter:
@@ -669,9 +655,9 @@ std::tuple<float, float> calculate_wheel_speeds(const cv::Mat& image, float base
         }
 #ifdef SMTC2GO_DEBUG
         if (frame_number % 20 == 0) {
-            printf("[帧 %d] 状态=%s 圆坏类型=%s 分支=%d 端点=%d 有环=%d 环位置=%d\n",
-                   frame_number, ring_status_name(s_ring_status), ring_type_name(s_ring_type),
-                   0, 0, 0, 0);
+            LOG_DEBUG("[帧 %d] 状态=%s 圆坏类型=%s 分支=%d 端点=%d 有环=%d 环位置=%d",
+                      frame_number, ring_status_name(s_ring_status), ring_type_name(s_ring_type),
+                      0, 0, 0, 0);
         }
         if (frame_number % 10 == 0) {
             save_debug_images(ring_status_name(s_ring_status), frame_number,
