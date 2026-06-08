@@ -323,8 +323,8 @@ std::tuple<float, float> calculate_wheel_speeds(const Point* line, int line_size
     float max_gain = base_speed * max_gain_ratio;
 
     // 限制斜率范围，防止极端情况
-    if (slope > 5.0f) slope = 5.0f;
-    if (slope < -5.0f) slope = -5.0f;
+    // if (slope > 5.0f) slope = 5.0f;
+    // if (slope < -5.0f) slope = -5.0f;
 
     // 只在这里替换斜率到增益比例的函数，例如线性、平方、三次方或tanh
     auto gain_function = [](float k) {
