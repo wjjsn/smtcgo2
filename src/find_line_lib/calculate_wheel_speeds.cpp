@@ -60,65 +60,100 @@ void save_debug_images(const char* status, int frame_number,
     cv::imwrite(path, result);
 }
 #endif
-
 bool choose_legacy_target_endpoint(const SkeletonAnalysisResult& skel_result,
                                    RingStatus status,
                                    RingType type,
                                    int width, int height,
                                    cv::Point& target_pt) {
+  
     if (skel_result.endpoint_points.empty()) return false;
 
-    if (status == RingStatus::NotFound ||
-        status == RingStatus::Discovered ||
-        status == RingStatus::Exiting) {
-        int min_y = height;
-        for (auto& p : skel_result.endpoint_points) {
-            int x = std::get<0>(p);
-            int y = std::get<1>(p);
-            if (y < min_y) { min_y = y; target_pt = cv::Point(x, y); }
-        }
-        return true;
-    }
-
-    if (status == RingStatus::PrepareEnter || status == RingStatus::AboutToExit) {
-        auto calc_weight = [width, height](int x, int y) -> double {
-            constexpr double w_left = 1.0;
-            constexpr double w_up = 0.5;
-            return w_left * (width - x) + w_up * (height - y);
-        };
+    // ==========================================================
+    // 1. 【核心拦截】：准备入环阶段 (PrepareEnter) -> 彻底防抖、防提前转
+    // ==========================================================
+    if (status == RingStatus::PrepareEnter) {
+        double max_weight = -1.0;
 
         if (type == RingType::Left) {
-            double max_weight = -1.0;
-            for (auto& p : skel_result.endpoint_points) {
+            // 左环岛：追求 x 越小越好。(width - x) 越大。
+            for (const auto& p : skel_result.endpoint_points) {
                 int x = std::get<0>(p);
                 int y = std::get<1>(p);
-                double weight = calc_weight(x, y);
-                if (weight > max_weight) { max_weight = weight; target_pt = cv::Point(x, y); }
+                
+                double dx = static_cast<double>(width - x);
+                // 【平方级非线性拉力】+ 压低纵向干扰
+                double weight = (dx * dx) + 0.05 * (height - y); 
+                
+                if (weight > max_weight) { 
+                    max_weight = weight; 
+                    target_pt = cv::Point(x, y); 
+                }
             }
         } else {
-            auto calc_weight_right = [width, height](int x, int y) -> double {
-                constexpr double w_right = 1.0;
-                constexpr double w_up = 0.5;
-                return w_right * x + w_up * (height - y);
-            };
-            double max_weight = -1.0;
-            for (auto& p : skel_result.endpoint_points) {
+            // 右环岛：追求 x 越大越好。
+            for (const auto& p : skel_result.endpoint_points) {
                 int x = std::get<0>(p);
                 int y = std::get<1>(p);
-                double weight = calc_weight_right(x, y);
-                if (weight > max_weight) { max_weight = weight; target_pt = cv::Point(x, y); }
+                
+                double dx = static_cast<double>(x);
+                // 【平方级非线性拉力】
+                double weight = (dx * dx) + 0.05 * (height - y);
+                
+                if (weight > max_weight) { 
+                    max_weight = weight; 
+                    target_pt = cv::Point(x, y); 
+                }
             }
         }
-        return true;
+        return max_weight >= 0.0;
     }
 
-    if (status == RingStatus::PrepareExit && skel_result.endpoint_points.size() == 1) {
-        auto& p = skel_result.endpoint_points[0];
-        target_pt = cv::Point(std::get<0>(p), std::get<1>(p));
-        return true;
-    }
+    // ==========================================================
+    // 2. 准备出环阶段 (PrepareExit)
+    // ==========================================================
+    if (status == RingStatus::PrepareExit) {
+        double w_x = 0.7;
+        double w_y = 0.8;
+        double max_weight = -1.0;
 
-    return false;
+        if (type == RingType::Left) {
+            for (const auto& p : skel_result.endpoint_points) {
+                int x = std::get<0>(p);
+                int y = std::get<1>(p);
+                double weight = w_x * (width - x) + w_y * (height - y);
+                if (weight > max_weight) { 
+                    max_weight = weight; 
+                    target_pt = cv::Point(x, y); 
+                }
+            }
+        } else {
+            for (const auto& p : skel_result.endpoint_points) {
+                int x = std::get<0>(p);
+                int y = std::get<1>(p);
+                double weight = w_x * x + w_y * (height - y);
+                if (weight > max_weight) { 
+                    max_weight = weight; 
+                    target_pt = cv::Point(x, y); 
+                }
+            }
+        }
+        return max_weight >= 0.0;
+    }
+    // ==========================================================
+    // 3. 常规巡线期 (NotFound / Discovered / Exiting) -> 寻最远点
+    // ==========================================================
+    int min_y = height;
+    bool found = false;
+    for (const auto& p : skel_result.endpoint_points) {
+        int x = std::get<0>(p);
+        int y = std::get<1>(p);
+        if (y < min_y) { 
+            min_y = y; 
+            target_pt = cv::Point(x, y); 
+            found = true;
+        }
+    }
+    return found;
 }
 
 bool nearest_skeleton_point(const uint8_t* skeleton, int width, int height,
@@ -223,8 +258,9 @@ bool select_folded_target_point(const uint8_t* skeleton, int width, int height,
     folded_target = legacy_target;
 
     // 长度越长，比例越小；长度越短，比例越大
+    //路程越长，给的控制比例就越小（越稳健）；路程越短，给的控制比例就越大（越灵敏）。
     auto length_to_ratio = [](double total_length) -> double {
-        constexpr double base_ratio = 0.8;
+        constexpr double base_ratio = 0.6;
         constexpr double length_scale = 100.0;
         return base_ratio * length_scale / (length_scale + total_length);
     };
@@ -273,71 +309,115 @@ bool select_folded_target_point(const uint8_t* skeleton, int width, int height,
 
 } // anonymous namespace
 
-// ==================== 轮速计算实现 ====================
-// 核心算法：基于中线斜率的差速控制
-//
-// 原理：
-//   假设我们用 Point {x, y} 描述中线上的点
-//   拟合 x = k*y + b，而不是 y = k*x + b
-//   这样正中间的竖直中线斜率为0，不会出现无穷大
-//   如果斜率 > 0，说明 x 随 y 增大而增大（中线越往前越偏右）
-//   如果斜率 < 0，说明 x 随 y 增大而减小（中线越往前越偏左）
-//
-// 算法步骤：
-//   1. 收集所有中线点 (x_i, y_i)
-//   2. 用最小二乘法拟合：x = k*y + b
-//      k = (n*sum_xy - sum_y*sum_x) / (n*sum_yy - sum_y*sum_y)
-//   3. 把斜率 k 通过 lambda 映射到增益比例
-//   4. 增益 > 0 说明要右转，增益 < 0 说明要左转
-//   5. 左右轮速度差由增益和 max_gain（= base_speed * max_gain_ratio）决定
+
+/**
+ * 
+ * - 轨1 (line_size == 2): 单点前瞻模式。基于横向偏差控制，引入内外侧独立增益，
+ * 使车辆在环岛或单边阶段能强行向外侧拉开距离，防止切内线咬尾。
+ * - 轨2 (line_size >  2): 全局巡线模式。基于最小二乘法拟合赛道斜率，通过 tanh 非线性平滑输出。
+ * - 防抖: 引入多级自适应低通滤波 (alpha) 与死区趋势保留，彻底消除回正抽搐与大弯跳点抖动。
+ * * @param line             赛道点数组（2个点时为当前点与前瞻点；大于2个点时为全局骨架点）
+ * @param line_size        点的数量
+ * @param base_speed       基础期望车速
+ * @param max_gain_ratio   最大速度增益比例（用于常规巡线限制）
+ * @return std::tuple<float, float> [左轮速度, 右轮速度]
+ * * @note 【调参黄金法则】
+ * 1. 进弯迟钝/推头：调大外轮增速系数 `k_p_outer` (默认 0.003)
+ * 2. 弯内吃内线/咬单边：调大内轮减速系数 `k_p_inner` (默认 0.010)
+ * 3. 进环岛大弯高频乱抖：调小大弯滤波系数 `alpha` (默认 0.4 -> 调至 0.3 或 0.25)
+ * 4. 直道细微扭动：调大死区 `DEAD_ZONE` (默认 2)
+ */
+
+
 std::tuple<float, float> calculate_wheel_speeds(const Point* line, int line_size,
                                                  float base_speed,
                                                  float max_gain_ratio) {
-  // 数据点太少，直接返回基础速度
-  // if (line_size < 2) {
-  //     return std::make_tuple(base_speed, base_speed);
-  // }
+   // 静态变量用于低通滤波
+    static float last_left_speed = base_speed;
+    static float last_right_speed = base_speed;
 
-  // 收集统计数据，用于最小二乘法
-  float sum_x = 0.0f;
-  float sum_y = 0.0f;
-  float sum_yy = 0.0f;
-  float sum_xy = 0.0f;
+    float left_speed = base_speed;
+    float right_speed = base_speed;
 
-  for (int i = 0; i < line_size; ++i) {
-    sum_x += static_cast<float>(line[i].x);
-    sum_y += static_cast<float>(line[i].y);
-    sum_yy += static_cast<float>(line[i].y) * line[i].y;
-    sum_xy += static_cast<float>(line[i].x) * line[i].y;
-  }
+    // 当传入2个点（起点和前瞻点）时，纯粹基于横向偏差控制（更适合状态机控制）
+    if (line_size == 2) {
+        int target_x = line[1].x; // 目标点 folded_target 的 X 坐标
+        int img_center_x = 80;    // 屏幕中心
+        
+        // 【优化】：为了让你离单边远一点，加入方向补偿偏移（根据环岛状态调整或在此微调）
+        int error_x = target_x - img_center_x; 
+        int abs_error = std::abs(error_x);
 
-    // 拟合 x = k*y + b，让竖直中线的斜率为0
-    float denom = static_cast<float>(line_size) * sum_yy - sum_y * sum_y;
+        float target_left = base_speed;
+        float target_right = base_speed;
 
-    float slope = 0.0f;
-    if (std::abs(denom) > 1e-5f) {
-        slope = (static_cast<float>(line_size) * sum_xy - sum_y * sum_x) / denom;
+        const int DEAD_ZONE = 2; // 死区
+
+        if (abs_error > DEAD_ZONE) {
+            float effective_error = static_cast<float>(abs_error - DEAD_ZONE);
+
+            // 动态计算【降速/增速系数】
+            float k_p_inner = 0.010f; // 稍微加大内侧减速灵敏度，让车身往外撤，拉大与单边距离
+            float inner_factor = 1.0f - (effective_error * k_p_inner);
+            if (inner_factor < 0.2f) inner_factor = 0.2f;
+
+            float k_p_outer = 0.003f;
+            float outer_factor = 1.0f + (effective_error * k_p_outer);
+            if (outer_factor > 1.4f) outer_factor = 1.4f;
+
+            // 分方向计算目标轮速
+            if (error_x > 0) { // 右转
+                target_right = base_speed * inner_factor;
+                target_left  = base_speed * outer_factor;
+            } else {           // 左转
+                target_left  = base_speed * inner_factor;
+                target_right = base_speed * outer_factor;
+            }
+            } else {
+        // === 【优化：真正的平缓回归】 ===
+        // 不要直接等于 base_speed，而是向 base_speed 靠拢，保留 50% 上一帧的转向趋势
+        target_left  = 0.5f * base_speed + 0.5f * last_left_speed;
+        target_right = 0.5f * base_speed + 0.5f * last_right_speed;
     }
 
-    // 计算最大速度增益
-    float max_gain = base_speed * max_gain_ratio;
+        // 自适应动态低通滤波
+        float alpha = 0.3f; 
+        if (abs_error <= DEAD_ZONE) {
+            alpha = 0.7f; // 回正时响应快一点，但不要强制 1.0 冲刷掉历史
+        } else if (abs_error <= 15) {
+            alpha = 0.6f; 
+        } else {
+            alpha = 0.4f; // 进环岛大弯时大滤波，对抗图像抖动
+        }
 
-    // 限制斜率范围，防止极端情况
-    // if (slope > 5.0f) slope = 5.0f;
-    // if (slope < -5.0f) slope = -5.0f;
+        left_speed  = alpha * target_left  + (1.0f - alpha) * last_left_speed;
+        right_speed = alpha * target_right + (1.0f - alpha) * last_right_speed;
 
-    // 只在这里替换斜率到增益比例的函数，例如线性、平方、三次方或tanh
-    auto gain_function = [](float k) {
-        constexpr float sensitivity = 2.0f;
-        return std::tanh(sensitivity * k);
-    };
-    float gain = max_gain * gain_function(slope);
+        last_left_speed  = left_speed;
+        last_right_speed = right_speed;
 
-    // 计算左右轮速度
-    // 增益为正时，左轮加速、右轮减速 -> 车辆右转
-    // 增益为负时，左轮减速、右轮加速 -> 车辆左转
-    float left_speed = base_speed + gain;
-    float right_speed = base_speed - gain;
+    } else {
+        // 如果点数大于2（走多点最小二乘拟合），采用前半段的斜率模型
+        float sum_x = 0.0f, sum_y = 0.0f, sum_yy = 0.0f, sum_xy = 0.0f;
+        for (int i = 0; i < line_size; ++i) {
+            sum_x += static_cast<float>(line[i].x);
+            sum_y += static_cast<float>(line[i].y);
+            sum_yy += static_cast<float>(line[i].y) * line[i].y;
+            sum_xy += static_cast<float>(line[i].x) * line[i].y;
+        }
+        float denom = static_cast<float>(line_size) * sum_yy - sum_y * sum_y;
+        float slope = 0.0f;
+        if (std::abs(denom) > 1e-5f) {
+            slope = (static_cast<float>(line_size) * sum_xy - sum_y * sum_x) / denom;
+        }
+        float max_gain = base_speed * max_gain_ratio;
+        if (slope > 5.0f) slope = 5.0f;
+        if (slope < -5.0f) slope = -5.0f;
+
+        float gain = max_gain * std::tanh(0.1f * slope);
+        left_speed = base_speed + gain;
+        right_speed = base_speed - gain;
+    }
 
     return std::make_tuple(left_speed, right_speed);
 }
@@ -377,7 +457,7 @@ std::tuple<float, float> calculate_wheel_speeds(const cv::Mat &image,
 #endif
     ++s_frame_number;
     int frame_number = s_frame_number;
-    constexpr int confirm_threshold = 20;
+    constexpr int confirm_threshold = 15;
     constexpr int img_width = 160;
     constexpr int img_height = 120;
 
