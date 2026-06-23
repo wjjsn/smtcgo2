@@ -531,13 +531,55 @@ std::tuple<float, float> calculate_wheel_speeds(const cv::Mat &image,
     if (best_contour_index >= 0) {
       std::vector<cv::Point> approx;
       cv::approxPolyDP(contours.at(best_contour_index), approx, 2, true);//
+
+      std::vector<int> hull; // 计算凸点
+      cv::convexHull(approx, hull, false, false);
+
+      if (hull.size() == approx.size()) {
+        // 纯凸出的形状
 #ifdef SMTC2GO_DEBUG
-      //   std::cout << "原" << contours.at(best_contour_index).size() <<
-      //   "个点。"
-      //             << "现在" << approx.size() << "个点。" <<'\n';
-      cv::drawContours(result_img, std::vector<std::vector<cv::Point>>{approx},
-                       0, cv::Scalar(0, 255, 0), 2);
+        //   std::cout << "原" << contours.at(best_contour_index).size() <<
+        //   "个点。"
+        //             << "现在" << approx.size() << "个点。"
+        //   <<'\n';
+        cv::drawContours(result_img,
+                         std::vector<std::vector<cv::Point>>{approx}, 0,
+                         cv::Scalar(0, 255, 0), 2);
 #endif
+      } else if (!hull.empty()) {
+        std::vector<cv::Vec4i> defects;
+        std::vector<cv::Point> concavePoints;
+        cv::convexityDefects(approx, hull, defects);
+        for (const auto &defect : defects) {
+          // cv::Vec4i 的结构：
+          // [0] = 缺陷起始点的索引
+          // [1] = 缺陷结束点的索引
+          // [2] = 缺陷最深点（凹点）的索引
+          // [3] = 凹点到凸包外边的近似距离（固定扩大了256倍，实际距离需除以
+          // 256.0）
+
+          int depth = defect[3] / 256;
+
+          // 过滤掉微小的噪声起伏，只有当凹陷深度大于一定阈值时才认为是凹点
+          if (depth > 5) {
+            int farthestIdx = defect[2]; // 凹点在原 contour 中的索引
+            concavePoints.push_back(approx[farthestIdx]);
+#ifdef SMTC2GO_DEBUG
+            //   std::cout << "原" << contours.at(best_contour_index).size() <<
+            //   "个点。"
+            //             << "现在" << approx.size() << "个点。"
+            //   <<'\n';
+            cv::drawContours(result_img,
+                             std::vector<std::vector<cv::Point>>{approx}, 0,
+                             cv::Scalar(0, 255, 0), 2);
+            for (auto point : concavePoints // 这个点就是要找的角点
+            ) {
+              cv::circle(result_img, point, 3, cv::Scalar(0xA5, 0x2A, 0x2A), 1);
+            }
+#endif
+          }
+        }
+      }
 
       // 骨架分析
       uint8_t skeleton_result[img_height * img_width];
@@ -574,26 +616,33 @@ std::tuple<float, float> calculate_wheel_speeds(const cv::Mat &image,
 
 #ifdef SMTC2GO_DEBUG
         // 绘制特征点
-        cv::Scalar blue(255, 0, 0), red(0, 0, 255), green(0, 255, 0);
-        cv::Scalar cyan(255, 255, 0), purple(255, 0, 255), yellow(0, 255, 255);
+        // cv::Scalar blue(255, 0, 0), red(0, 0, 255), green(0, 255, 0);
+        // cv::Scalar cyan(255, 255, 0), purple(255, 0, 255), yellow(0, 255,
+        // 255);
 
-        for (auto& p : skel_result.endpoint_points)
-            cv::circle(result_img, cv::Point(std::get<0>(p), std::get<1>(p)), 3, blue, -1);
-        for (auto& p : skel_result.bifurcation_points)
-            cv::circle(result_img, cv::Point(std::get<0>(p), std::get<1>(p)), 5, red, -1);
+        // for (auto& p : skel_result.endpoint_points)
+        //     cv::circle(result_img, cv::Point(std::get<0>(p), std::get<1>(p)),
+        //     3, blue, -1);
+        // for (auto& p : skel_result.bifurcation_points)
+        //     cv::circle(result_img, cv::Point(std::get<0>(p), std::get<1>(p)),
+        //     5, red, -1);
 
-        if (skel_result.left_start_x > 0 || skel_result.left_start_y > 0) {
-            cv::circle(result_img, cv::Point(skel_result.left_start_x, skel_result.left_start_y), 4, cyan, -1);
-            cv::putText(result_img, "L",
-                cv::Point(skel_result.left_start_x - 5, skel_result.left_start_y - 8),
-                cv::FONT_HERSHEY_SIMPLEX, 0.3, cyan, 1);
-        }
-        if (skel_result.right_start_x > 0 || skel_result.right_start_y > 0) {
-            cv::circle(result_img, cv::Point(skel_result.right_start_x, skel_result.right_start_y), 4, cyan, -1);
-            cv::putText(result_img, "R",
-                cv::Point(skel_result.right_start_x - 5, skel_result.right_start_y - 8),
-                cv::FONT_HERSHEY_SIMPLEX, 0.3, cyan, 1);
-        }
+        // if (skel_result.left_start_x > 0 || skel_result.left_start_y > 0) {
+        //     cv::circle(result_img, cv::Point(skel_result.left_start_x,
+        //     skel_result.left_start_y), 4, cyan, -1); cv::putText(result_img,
+        //     "L",
+        //         cv::Point(skel_result.left_start_x - 5,
+        //         skel_result.left_start_y - 8), cv::FONT_HERSHEY_SIMPLEX, 0.3,
+        //         cyan, 1);
+        // }
+        // if (skel_result.right_start_x > 0 || skel_result.right_start_y > 0) {
+        //     cv::circle(result_img, cv::Point(skel_result.right_start_x,
+        //     skel_result.right_start_y), 4, cyan, -1); cv::putText(result_img,
+        //     "R",
+        //         cv::Point(skel_result.right_start_x - 5,
+        //         skel_result.right_start_y - 8), cv::FONT_HERSHEY_SIMPLEX,
+        //         0.3, cyan, 1);
+        // }
 #endif
 
         auto ring_result = [&]() {
@@ -621,8 +670,8 @@ std::tuple<float, float> calculate_wheel_speeds(const cv::Mat &image,
                                        s_ring_status, s_ring_type, legacy_target, folded_target)) {
 #ifdef SMTC2GO_DEBUG
             cv::Scalar purple(255, 0, 255), yellow(0, 255, 255);
-            cv::circle(result_img, legacy_target, 5, purple, -1);
-            cv::circle(result_img, folded_target, 5, yellow, -1);
+            // cv::circle(result_img, legacy_target, 5, purple, -1);
+            // cv::circle(result_img, folded_target, 5, yellow, -1);
 #endif
 
             cv::Point start_center(
