@@ -529,13 +529,19 @@ std::tuple<float, float> calculate_wheel_speeds(const cv::Mat &image,
     }
 
     if (best_contour_index >= 0) {
+      std::vector<cv::Point> approx;
+      cv::approxPolyDP(contours.at(best_contour_index), approx, 2, true);//
 #ifdef SMTC2GO_DEBUG
-        cv::drawContours(result_img, contours, best_contour_index, cv::Scalar(0, 255, 0), 2);
+      //   std::cout << "原" << contours.at(best_contour_index).size() <<
+      //   "个点。"
+      //             << "现在" << approx.size() << "个点。" <<'\n';
+      cv::drawContours(result_img, std::vector<std::vector<cv::Point>>{approx},
+                       0, cv::Scalar(0, 255, 0), 2);
 #endif
 
-        // 骨架分析
-        uint8_t skeleton_result[img_height * img_width];
-        {
+      // 骨架分析
+      uint8_t skeleton_result[img_height * img_width];
+      {
         TRACE_SCOPE("骨架提取");
 
         cv::Mat road_mask = cv::Mat::zeros(img_height, img_width, CV_8UC1);
@@ -550,7 +556,7 @@ std::tuple<float, float> calculate_wheel_speeds(const cv::Mat &image,
                 road_binary[y * img_width + x] = road_area.at<uint8_t>(y, x);
 
         skeletonize(road_binary, skeleton_result, img_width, img_height);
-        } // skeleton
+      } // skeleton
 
 #ifdef SMTC2GO_DEBUG
         skeleton_img = cv::Mat(img_height, img_width, CV_8UC1, skeleton_result).clone();
