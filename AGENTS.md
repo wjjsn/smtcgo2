@@ -2,4 +2,4 @@
 
 配置：`pwsh.exe -c './env.ps1 cmake --preset conan-release'`
 
-编译`:pwsh.exe -c './env.ps1 cmake --build --preset conan-release --parallel'`
+编译：`pwsh.exe -c './env.ps1 cmake --build --preset conan-release --parallel'`
