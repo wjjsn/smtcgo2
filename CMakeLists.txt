@@ -40,10 +40,14 @@ target_include_directories(find_line_lib
         ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_link_libraries(find_line_lib
-    PUBLIC ${OpenCV_LIBS}
-    stdc++fs
-)
+target_link_libraries(find_line_lib PUBLIC 
+                        ${OpenCV_LIBS})
+
+
+if (NOT MSVC)
+    target_link_libraries(find_line_lib PRIVATE stdc++fs)
+endif()
+
 
 # ==================== 可执行文件 ====================
 add_executable(complete_ring_process app/complete_ring_process.cpp)
