@@ -10,14 +10,15 @@
 
 #include "common.h"
 
-namespace find_line_lib {
+namespace find_line_lib
+{
 
 /**
  * @brief 处理赛道上的各种元素（圆环、路障、目标板等）
  *
  * 当前实现为空框架，各个状态的处理逻辑待填充
  */
-uint8_t* process_track_element(const uint8_t* img, int width, int height,
-                                StatusSwitcher* ss);
+uint8_t *process_track_element(const uint8_t *img, int width, int height,
+			       StatusSwitcher *ss);
 
 }

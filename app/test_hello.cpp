@@ -24,7 +24,8 @@
  *   2. 将结果打印到标准输出
  *   3. 程序正常退出
  */
-int main() {
-    std::cout << find_line_lib::hello() << std::endl;
-    return 0;
+int main()
+{
+	std::cout << find_line_lib::hello() << std::endl;
+	return 0;
 }

@@ -10,7 +10,8 @@
 #include "common.h"
 #include <tuple>
 
-namespace find_line_lib {
+namespace find_line_lib
+{
 
 /**
  * @brief 检查二值图像中的路障，返回避障引导连线
@@ -29,8 +30,8 @@ namespace find_line_lib {
  * @param threshold 距离阈值，路障边缘与对应边界起点横向距离<=此值时触发避障
  * @return 左侧路障返回 (左起点, 黑块右下角点)，右侧路障返回 (右起点, 黑块左下角点)，无路障返回 nullptr
  */
-std::tuple<Point, Point>* check_roadblock(const uint8_t* binary_img, int width, int height,
-                                           const std::tuple<Point, Point>* start_point,
-                                           int threshold);
+std::tuple<Point, Point> *
+check_roadblock(const uint8_t *binary_img, int width, int height,
+		const std::tuple<Point, Point> *start_point, int threshold);
 
 }

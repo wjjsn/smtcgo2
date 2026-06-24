@@ -2,7 +2,8 @@
 
 #include "common.h"
 
-namespace find_line_lib {
+namespace find_line_lib
+{
 
 // ==================== 状态切换器 ====================
 // 状态切换器的实现在 common.h 中定义

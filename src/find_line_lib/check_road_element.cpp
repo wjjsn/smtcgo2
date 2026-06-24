@@ -10,7 +10,8 @@
 #include "find_line_lib/ring.h"
 #include <opencv2/opencv.hpp>
 
-namespace find_line_lib {
+namespace find_line_lib
+{
 
 // ==================== 赛道元素处理 ====================
 // 对应 Python: 赛道元素处理(img, ss)
@@ -57,15 +58,16 @@ namespace find_line_lib {
 //           pass
 //
 // C++ 当前直接返回原图
-uint8_t* process_track_element(const uint8_t* img, int width, int height,
-                                StatusSwitcher* ss) {
-    // 当前为空实现，直接返回原图
-    // TODO: 根据 ss 中的各种状态进行相应处理
-    //   - ss->ring_status: 圆环状态，处理圆环检测和补线
-    //   - ss->model_status: 赛道类型（岔路），处理岔路补线
-    //   - ss->target_board_status: 目标板状态，处理目标板检测和补线
+uint8_t *process_track_element(const uint8_t *img, int width, int height,
+			       StatusSwitcher *ss)
+{
+	// 当前为空实现，直接返回原图
+	// TODO: 根据 ss 中的各种状态进行相应处理
+	//   - ss->ring_status: 圆环状态，处理圆环检测和补线
+	//   - ss->model_status: 赛道类型（岔路），处理岔路补线
+	//   - ss->target_board_status: 目标板状态，处理目标板检测和补线
 
-    return const_cast<uint8_t*>(img);
+	return const_cast<uint8_t *>(img);
 }
 
 }

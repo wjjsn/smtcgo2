@@ -8,7 +8,8 @@
 
 #include "find_line_lib/status_switcher.h"
 
-namespace find_line_lib {
+namespace find_line_lib
+{
 
 // 状态切换器的主要功能：
 // 1. 圆环状态机管理

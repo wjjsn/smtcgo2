@@ -3,7 +3,8 @@
 #include "common.h"
 #include <tuple>
 
-namespace find_line_lib {
+namespace find_line_lib
+{
 
 // ==================== 起点查找 ====================
 // 在二值图像中查找左右边界起点（或上下边界起点）
@@ -20,14 +21,10 @@ namespace find_line_lib {
 //
 // 返回值：
 //   找到返回左右/上下两个点的指针，没找到返回nullptr
-std::tuple<Point, Point>* get_start_point(
-    const uint8_t* bin_img,
-    int width, int height,
-    const Point* start_point = nullptr,
-    int left_limit = 1,
-    int right_limit = -1,
-    int upper_limit = 1,
-    int lower_limit = -1,
-    const char* direction = "horizontal");
+std::tuple<Point, Point> *
+get_start_point(const uint8_t *bin_img, int width, int height,
+		const Point *start_point = nullptr, int left_limit = 1,
+		int right_limit = -1, int upper_limit = 1, int lower_limit = -1,
+		const char *direction = "horizontal");
 
 }
