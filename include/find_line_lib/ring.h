@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <opencv2/opencv.hpp>
+#include <string>
 #include <tuple>
 
 namespace find_line_lib
@@ -211,17 +212,27 @@ class ring {
 				if (hull.size() == approx.size()) {
 					// 纯凸出的形状
 #ifdef SMTC2GO_DEBUG
-					// LOG_DEBUG(
-					// 	"原%d个点，化简后%d个点",
-					// 	contours.at(best_contour_index)
-					// 		.size(),
-					// 	approx.size());
+					LOG_DEBUG(
+						"原%d个点，化简后%d个点",
+						contours.at(best_contour_index)
+							.size(),
+						approx.size());
 					cv::drawContours(
 						result_img,
 						std::vector<
 							std::vector<cv::Point> >{
 							approx },
 						0, cv::Scalar(0, 255, 0), 2);
+					for (auto i = 0; i < approx.size();
+					     ++i) {
+						cv::putText(
+							result_img,
+							std::to_string(i),
+							approx.at(i),
+							cv::FONT_HERSHEY_SIMPLEX,
+							0.4,
+							cv::Scalar(0, 0, 255));
+					}
 #endif
 				} else if (!hull.empty()) {
 					std::vector<cv::Vec4i> defects;
@@ -266,6 +277,16 @@ class ring {
 								      0x2A),
 							   1);
 					}
+					for (auto i = 0; i < approx.size();
+					     ++i) {
+						cv::putText(
+							result_img,
+							std::to_string(i),
+							approx.at(i),
+							cv::FONT_HERSHEY_SIMPLEX,
+							0.4,
+							cv::Scalar(0, 0, 255));
+					}
 
 #endif
 				}
@@ -285,8 +306,11 @@ class ring {
 		};
 		auto 是左边的 = [](cv::Point p) { return p.x < img_width / 2; };
 		auto 是右边的 = [](cv::Point p) { return p.x > img_width / 2; };
-		auto 找最近左上角 = [](cv::Point a, cv::Point b) {
+		auto 找最近左上角点 = [](cv::Point a, cv::Point b) {
 			return (a.y + a.x) < (b.y + b.x);
+		};
+		auto 找最上方点 = [](cv::Point a, cv::Point b) {
+			return a.y < b.y;
 		};
 
 		switch (ring_status_) {
@@ -384,11 +408,11 @@ class ring {
 					auto &right_pt =
 						std::get<1>(*start_result);
 
-					// 找到最靠近左上的凹点
+					// 找到最靠近上方的凹点
 					auto nearest = std::min_element(
 						concavePoints.begin(),
 						concavePoints.end(),
-						找最近左上角);
+						找最上方点);
 
 					if (nearest != concavePoints.end()) {
 						// 连接右起始点和凹点
@@ -435,13 +459,13 @@ class ring {
 					auto top_left = std::min_element(
 						best_contour.begin(),
 						best_contour.end(),
-						找最近左上角);
+						找最近左上角点);
 
 					// 找最靠近左上的凹点
 					auto nearest_concave = std::min_element(
 						concavePoints.begin(),
 						concavePoints.end(),
-						找最近左上角);
+						找最近左上角点);
 
 					// 连接左上角点和凹点
 					cv::line(result_img, *top_left,
