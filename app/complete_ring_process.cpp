@@ -5,6 +5,9 @@
 #include <algorithm>
 
 #include "find_line_lib/calculate_wheel_speeds.h"
+#include "find_line_lib/ring.h"
+
+find_line_lib::ring ring;
 
 int main()
 {
@@ -18,6 +21,7 @@ int main()
 
 	int frame_count = 0;
 	std::vector<cv::Mat> frame_cache;
+	frame_cache.reserve(4330);
 
 	std::cout << "正在加载视频帧..." << std::endl;
 	cv::Mat frame;
@@ -35,7 +39,8 @@ int main()
 	int current_idx = 0;
 
 	while (current_idx < frame_count) {
-		find_line_lib::calculate_wheel_speeds(frame_cache[current_idx]);
+		// find_line_lib::calculate_wheel_speeds(frame_cache[current_idx]);
+		ring.check_ring(frame_cache[current_idx]);
 
 		int wait_time = is_playing ? 1 : 0;
 		char key = cv::waitKey(wait_time) & 0xFF;
