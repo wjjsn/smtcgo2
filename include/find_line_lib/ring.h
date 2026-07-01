@@ -303,15 +303,15 @@ class ring {
 					dilated.at<uint8_t>(y, x);
 
 		// 辅助 lambda：判断凹点位置
-		auto 是下面的 = [](cv::Point p) {
+		auto is_at_bottom = [](cv::Point p) { // 是下面的
 			return p.y > img_height * 2 / 3;
 		};
-		auto 是左边的 = [](cv::Point p) { return p.x < img_width / 2; };
-		auto 是右边的 = [](cv::Point p) { return p.x > img_width / 2; };
-		auto 找最近左上角点 = [](cv::Point a, cv::Point b) {
+		auto is_at_left = [](cv::Point p) { return p.x < img_width / 2; }; // 是左边的
+		auto is_at_right = [](cv::Point p) { return p.x > img_width / 2; }; // 是右边的
+		auto find_nearest_top_left = [](cv::Point a, cv::Point b) { // 找最近左上角点
 			return (a.y + a.x) < (b.y + b.x);
 		};
-		auto 找最上方点 = [](cv::Point a, cv::Point b) {
+		auto find_topmost = [](cv::Point a, cv::Point b) { // 找最上方点
 			return a.y < b.y;
 		};
 
@@ -327,8 +327,8 @@ class ring {
 			if (!(concavePoints.empty())) {
 				auto best_contour =
 					contours.at(best_contour_index);
-				int 轮廓高度 = 0;
-				int 轮廓宽度 = 0;
+				int contour_height = 0; // 轮廓高度
+				int contour_width = 0; // 轮廓宽度
 
 				// 找到最高和最低的点，算出轮廓的高度
 				// 找到最左和最右的点，算出宽度
@@ -351,27 +351,27 @@ class ring {
 								return a.x <
 								       b.x;
 							});
-					轮廓高度 = max_y->y - min_y->y;
-					轮廓宽度 = max_x->x - min_x->x;
+					contour_height = max_y->y - min_y->y;
+					contour_width = max_x->x - min_x->x;
 				}
 
-				for (auto 角点 : concavePoints) {
-					if (是下面的(角点)) {
-						if (是左边的(角点)) {
+				for (auto corner : concavePoints) { // 角点
+					if (is_at_bottom(corner)) {
+						if (is_at_left(corner)) {
 #ifdef SMTC2GO_DEBUG
 							LOG_DEBUG(
 								"发现左圆环，凹点(%d,%d)",
-								角点.x, 角点.y);
+								corner.x, corner.y);
 #endif
 							ring_status_ = RingStatus::
 								Discovered;
 							ring_type_ =
 								RingType::Left;
-						} else if (是右边的(角点)) {
+						} else if (is_at_right(corner)) {
 #ifdef SMTC2GO_DEBUG
 							LOG_DEBUG(
 								"发现右圆环，凹点(%d,%d)",
-								角点.x, 角点.y);
+								corner.x, corner.y);
 #endif
 							ring_status_ = RingStatus::
 								Discovered;
@@ -414,7 +414,7 @@ class ring {
 					auto nearest = std::min_element(
 						concavePoints.begin(),
 						concavePoints.end(),
-						找最上方点);
+						find_topmost);
 
 					if (nearest != concavePoints.end()) {
 						// 连接右起始点和凹点
@@ -461,13 +461,13 @@ class ring {
 					auto top_left = std::min_element(
 						best_contour.begin(),
 						best_contour.end(),
-						找最近左上角点);
+						find_nearest_top_left);
 
 					// 找最靠近左上的凹点
 					auto nearest_concave = std::min_element(
 						concavePoints.begin(),
 						concavePoints.end(),
-						找最近左上角点);
+						find_nearest_top_left);
 
 					// 连接左上角点和凹点
 					cv::line(result_img, *top_left,
@@ -508,16 +508,16 @@ class ring {
 
 					// 画一条指定斜率的线穿过质心
 					// 以质心为中心，向对角延伸
-					float 斜率 = 0.5f;
+					float slope = 0.5f; // 斜率
 					int half = std::max(bbox.width,
 							    bbox.height);
-					// 方向向量 (1, 斜率)，归一化后乘以 half/2
+					// 方向向量 (1, slope)，归一化后乘以 half/2
 					double len =
-						std::sqrt(1.0 + 斜率 * 斜率);
+						std::sqrt(1.0 + slope * slope);
 					int dx = static_cast<int>(
 						half / 2.0 / len);
 					int dy = static_cast<int>(
-						half / 2.0 * 斜率 / len);
+						half / 2.0 * slope / len);
 					cv::line(result_img,
 						 cv::Point(cx - dx, cy - dy),
 						 cv::Point(cx + dx, cy + dy),
@@ -536,7 +536,7 @@ class ring {
 				auto it = std::find_if(
 					concavePoints.begin(),
 					concavePoints.end(), [&](cv::Point p) {
-						return 是左边的(p) &&
+						return is_at_left(p) &&
 						       p.y > img_height / 4;
 					});
 
