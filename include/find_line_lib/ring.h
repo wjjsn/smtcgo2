@@ -200,6 +200,7 @@ class ring {
 		}
 
 		std::vector<cv::Point> concavePoints;
+		std::vector<cv::Point> concavePoints_will_not_be_used;
 		{
 			TRACE_SCOPE("找到凹点");
 			if (best_contour_index >= 0) {
@@ -254,8 +255,51 @@ class ring {
 						if (depth > 5) {
 							int farthestIdx = defect
 								[2]; // 凹点在原 contour 中的索引
-							concavePoints.push_back(
-								approx[farthestIdx]);
+							// 计算前一个点、当前点、后一个点组成的角度
+							int n = static_cast<int>(
+								approx.size());
+							cv::Point prev = approx
+								[(farthestIdx -
+								  1 + n) %
+								 n];
+							cv::Point curr = approx
+								[farthestIdx];
+							cv::Point next = approx
+								[(farthestIdx +
+								  1) %
+								 n];
+							cv::Point v1 =
+								prev - curr;
+							cv::Point v2 =
+								next - curr;
+							double dot =
+								v1.x * v2.x +
+								v1.y * v2.y;
+							double len1 = std::sqrt(
+								v1.x * v1.x +
+								v1.y * v1.y);
+							double len2 = std::sqrt(
+								v2.x * v2.x +
+								v2.y * v2.y);
+							double cos_angle =
+								dot /
+								(len1 * len2);
+							cos_angle = std::clamp(
+								cos_angle, -1.0,
+								1.0);
+							double angle =
+								std::acos(
+									cos_angle) *
+								180.0 / CV_PI;
+								//过滤掉角度过大的点，避免误判
+							if (angle > 150.0) {
+								concavePoints_will_not_be_used
+									.push_back(
+										curr);
+							} else {
+								concavePoints.push_back(
+									curr);
+							}
 						}
 					}
 #ifdef SMTC2GO_DEBUG
@@ -277,6 +321,15 @@ class ring {
 							   cv::Scalar(0xA5,
 								      0x2A,
 								      0x2A),
+							   1);
+					}
+					for (auto point :
+					     concavePoints_will_not_be_used // 这是被过滤掉的角点
+					) {
+						cv::circle(result_img, point, 3,
+							   cv::Scalar(0xA5,
+								      0x00,
+								      0xFF),
 							   1);
 					}
 					for (auto i = 0; i < approx.size();
