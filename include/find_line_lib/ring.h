@@ -17,6 +17,8 @@
 #include "find_line_lib/get_start_point.h"
 #include <algorithm>
 #include <filesystem>
+#include <opencv2/core/types.hpp>
+#include <opencv2/imgproc.hpp>
 #include <opencv2/opencv.hpp>
 #include <string>
 #include <tuple>
@@ -487,27 +489,42 @@ class ring {
 		case RingStatus::Exiting: {
 			/*
 			以左圆环为例
-			1. 无凹点时，画一条斜率为-1的线经过轮廓中点
+			1. 无凹点时，画一条斜率为-1的线经过轮廓质心
 			2. 有凹点时，在左边中下方找到凹点则用左起始点连接
 			*/
 			if (concavePoints.empty()) {
 				auto best_contour =
 					contours.at(best_contour_index);
 				if (!best_contour.empty()) {
-					// 计算轮廓 bounding rect 的中心
 					cv::Rect bbox =
 						cv::boundingRect(best_contour);
-					int cx = bbox.x + bbox.width / 2;
-					int cy = bbox.y + bbox.height / 2;
+					// 计算轮廓质心
+					cv::Moments m =
+						cv::moments(best_contour);
+					int cx =
+						static_cast<int>(m.m10 / m.m00);
+					int cy =
+						static_cast<int>(m.m01 / m.m00);
 
-					// 画一条斜率为 -1 的线穿过中心点
-					// 线的端点取轮廓 bounding rect 的对角
-					cv::line(
-						result_img,
-						cv::Point(bbox.x, bbox.y),
-						cv::Point(bbox.x + bbox.width,
-							  bbox.y + bbox.height),
-						cv::Scalar(0, 0, 255), 2);
+					// 画一条指定斜率的线穿过质心
+					// 以质心为中心，向对角延伸
+					float 斜率 = 0.5f;
+					int half = std::max(bbox.width,
+							    bbox.height);
+					// 方向向量 (1, 斜率)，归一化后乘以 half/2
+					double len =
+						std::sqrt(1.0 + 斜率 * 斜率);
+					int dx = static_cast<int>(
+						half / 2.0 / len);
+					int dy = static_cast<int>(
+						half / 2.0 * 斜率 / len);
+					cv::line(result_img,
+						 cv::Point(cx - dx, cy - dy),
+						 cv::Point(cx + dx, cy + dy),
+						 cv::Scalar(0, 0, 255), 2);
+					cv::circle(result_img,
+						   cv::Point(cx, cy), 1,
+						   cv::Scalar(255, 0, 0));
 #ifdef SMTC2GO_DEBUG
 					LOG_DEBUG(
 						"Exiting: 画对角线穿过中心(%d,%d)",
