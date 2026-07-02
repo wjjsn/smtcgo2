@@ -14,7 +14,8 @@
 #pragma once
 
 #include "common.h"
-#include "find_line_lib/get_start_point.h"
+#include "find_line_lib/imgproc.hpp"
+#include "road.hpp"
 #include <algorithm>
 #include <filesystem>
 #include <opencv2/core/types.hpp>
@@ -79,6 +80,7 @@ class ring {
 	RingStatus ring_status_;
 	RingType ring_type_;
 	int frame_number_ = 0;
+	imgproc imgprocsser_{ img_width, img_height };
 
 	bool
 	try_discover_ring(const uint8_t *bin_img,
@@ -159,47 +161,8 @@ class ring {
 		int best_contour_index = -1;
 		{
 			TRACE_SCOPE("找到对的轮廓");
-			int min_area = img_width * img_height * 10 /
-				       100; // get_start_point 获取 L/R 起点
-			uint8_t full_binary[img_height * img_width];
-			for (int y = 0; y < img_height; ++y)
-				for (int x = 0; x < img_width; ++x)
-					full_binary[y * img_width + x] =
-						dilated.at<uint8_t>(y, x);
-
-			int ref_center_x = img_width / 2;
-			Point start_pt(img_width / 2, img_height - 1);
-			auto start_result = get_start_point(
-				full_binary, img_width, img_height, &start_pt,
-				1, img_width - 1, 1, img_height - 1,
-				"horizontal");
-			if (start_result != nullptr) {
-				auto &left_pt = std::get<0>(*start_result);
-				auto &right_pt = std::get<1>(*start_result);
-				ref_center_x = (left_pt.x + right_pt.x) / 2;
-			}
-
-			// 筛选最底部居中轮廓
-			int best_dist = img_width;
-			for (size_t i = 0; i < contours.size(); ++i) {
-				double area = cv::contourArea(contours[i]);
-				if (area < min_area)
-					continue;
-				cv::Rect bounding =
-					cv::boundingRect(contours[i]);
-				int bottom_y = bounding.y + bounding.height;
-				if (bottom_y < img_height - 2)
-					continue;
-				int contour_center_x =
-					bounding.x + bounding.width / 2;
-				int dist = std::abs(contour_center_x -
-						    ref_center_x);
-				if (dist < best_dist) {
-					best_dist = dist;
-					best_contour_index =
-						static_cast<int>(i);
-				}
-			}
+			best_contour_index = imgprocsser_.find_best_contour(
+				dilated, contours);
 		}
 
 		// 轮廓外区域置黑
@@ -362,13 +325,6 @@ class ring {
 			}
 		}
 
-		// 准备平面二值数组，供 get_start_point 使用
-		uint8_t full_binary[img_height * img_width];
-		for (int y = 0; y < img_height; ++y)
-			for (int x = 0; x < img_width; ++x)
-				full_binary[y * img_width + x] =
-					dilated.at<uint8_t>(y, x);
-
 		// 辅助 lambda：判断凹点位置
 		auto is_at_bottom = [](cv::Point p) { // 是下面的
 			return p.y > img_height * 2 / 3;
@@ -447,17 +403,12 @@ class ring {
 
 			if (!(concavePoints.empty())) {
 				// 获取左右起始点
-				Point sp(img_width / 2, img_height - 1);
-				auto start_result = get_start_point(
-					full_binary, img_width, img_height, &sp,
-					1, img_width - 1, 1, img_height - 1,
-					"horizontal");
-
-				if (start_result != nullptr) {
-					auto &left_pt =
-						std::get<0>(*start_result);
-					auto &right_pt =
-						std::get<1>(*start_result);
+				start_point sp;
+				auto start_result =
+					road::get_start_point(dilated, sp);
+				if (start_result) {
+					auto left_pt = sp.left;
+					auto right_pt = sp.right;
 
 					// 找到最靠近上方的凹点
 					auto nearest = std::min_element(
@@ -629,17 +580,14 @@ class ring {
 
 				if (it != concavePoints.end()) {
 					// 用对应侧起始点连接
-					Point sp(img_width / 2, img_height - 1);
-					auto start_result = get_start_point(
-						full_binary, img_width,
-						img_height, &sp, 1,
-						img_width - 1, 1,
-						img_height - 1, "horizontal");
-
-					if (start_result != nullptr) {
-						auto &side_pt = is_left_ring
-							? std::get<0>(*start_result)
-							: std::get<1>(*start_result);
+					start_point sp;
+					auto start_result =
+						road::get_start_point(dilated,
+								      sp);
+					if (start_result) {
+						auto &side_pt =
+							is_left_ring ? sp.left :
+								       sp.right;
 						cv::line(result_img,
 							 cv::Point(side_pt.x,
 								   side_pt.y),
@@ -669,6 +617,27 @@ class ring {
 				}
 			}
 		} break;
+		}
+
+		{
+			TRACE_SCOPE("再次检测所有轮廓");
+			cv::findContours(result_img, contours, cv::noArray(),
+					 cv::RETR_TREE,
+					 cv::CHAIN_APPROX_SIMPLE);
+		}
+		{
+			TRACE_SCOPE("再次找到对的轮廓");
+			best_contour_index = imgprocsser_.find_best_contour(
+				dilated, contours);
+		}
+		// 轮廓外区域置黑
+		if (best_contour_index >= 0) {
+			cv::Mat contour_mask =
+				cv::Mat::zeros(img_height, img_width, CV_8U);
+			cv::drawContours(contour_mask, contours,
+					 best_contour_index, cv::Scalar(255),
+					 cv::FILLED);
+			cv::bitwise_and(result_img, contour_mask, result_img);
 		}
 #ifdef SMTC2GO_DEBUG_IMSHOW
 		cv::Mat result_display;

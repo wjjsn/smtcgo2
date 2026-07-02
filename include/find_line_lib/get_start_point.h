@@ -21,10 +21,11 @@ namespace find_line_lib
 //
 // 返回值：
 //   找到返回左右/上下两个点的指针，没找到返回nullptr
+
+[[deprecated("请用class imgproc代替")]]
 std::tuple<Point, Point> *
 get_start_point(const uint8_t *bin_img, int width, int height,
 		const Point *start_point = nullptr, int left_limit = 1,
 		int right_limit = -1, int upper_limit = 1, int lower_limit = -1,
 		const char *direction = "horizontal");
-
 }
