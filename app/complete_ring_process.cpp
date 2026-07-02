@@ -6,14 +6,15 @@
 
 #include "find_line_lib/calculate_wheel_speeds.h"
 #include "find_line_lib/ring.h"
-
+#include "find_line_lib/road.hpp"
+#include "find_line_lib/thinning.h"
 find_line_lib::ring ring;
-
+find_line_lib::road road;
 int main()
 {
 	std::cout << "OpenCV loaded OK" << std::endl;
 
-	cv::VideoCapture cap("png/left_ring.mp4");
+	cv::VideoCapture cap("png/right_ring.mp4");
 	if (!cap.isOpened()) {
 		std::cout << "无法打开视频" << std::endl;
 		return 1;
@@ -38,9 +39,25 @@ int main()
 	bool is_playing = true;
 	int current_idx = 0;
 
+	cv::namedWindow("center_line", cv::WINDOW_NORMAL);
+	cv::resizeWindow("center_line", 400, 300);
+
 	while (current_idx < frame_count) {
-		// find_line_lib::calculate_wheel_speeds(frame_cache[current_idx]);
-		ring.check_ring(frame_cache[current_idx]);
+		auto bin_img = ring.check_ring(frame_cache[current_idx]);
+		cv::copyMakeBorder(bin_img, bin_img, 1, 0, 1, 1,
+				   cv::BORDER_CONSTANT, cv::Scalar(0));
+		cv::Mat skeleton_img;
+		cv::ximgproc::thinning(bin_img, skeleton_img,
+				       cv::ximgproc::THINNING_GUOHALL);
+		cv::Mat debug_display;
+		cv::resize(skeleton_img, debug_display, cv::Size(400, 300));
+		cv::imshow("center_line", debug_display);
+		// cv::imwrite("debug_frames/" + std::to_string(current_idx) +
+		// 		    "_display" + ".png",
+		// 	    bin_img);
+		// cv::imwrite("debug_frames/" + std::to_string(current_idx) +
+		// 		    "_skeleton" + ".png",
+		// 	    skeleton_img);
 
 		int wait_time = is_playing ? 1 : 0;
 		char key = cv::waitKey(wait_time) & 0xFF;
