@@ -378,39 +378,14 @@ class ring {
       较大的圆环时，圆环导致轮廓凹进去的部分会检测到一个凹点。这个点和圆环检测到的最窄的点是重合的
       */
 			if (!(concavePoints.empty())) {
-				auto best_contour =
-					contours.at(best_contour_index);
-				int contour_height = 0; // 轮廓高度
-				int contour_width = 0; // 轮廓宽度
-
-				// 找到最高和最低的点，算出轮廓的高度
-				// 找到最左和最右的点，算出宽度
-				if (!best_contour.empty()) {
-					auto [min_y, max_y] =
-						std::minmax_element(
-							best_contour.begin(),
-							best_contour.end(),
-							[](cv::Point a,
-							   cv::Point b) {
-								return a.y <
-								       b.y;
-							});
-					auto [min_x, max_x] =
-						std::minmax_element(
-							best_contour.begin(),
-							best_contour.end(),
-							[](cv::Point a,
-							   cv::Point b) {
-								return a.x <
-								       b.x;
-							});
-					contour_height = max_y->y - min_y->y;
-					contour_width = max_x->x - min_x->x;
-				}
-
 				for (auto corner : concavePoints) { // 角点
 					if (is_at_bottom(corner)) {
-						if (is_at_left(corner)) {
+						// auto value = discover_ring(
+						// 	full_binary, img_width,
+						// 	img_height);
+						if (!concavePoints_will_not_be_used.empty()) {
+							if (is_at_left(
+								    corner)) {
 #ifdef SMTC2GO_DEBUG
 							LOG_DEBUG(
 								"发现左圆环，凹点(%d,%d)",
@@ -420,7 +395,8 @@ class ring {
 								Discovered;
 							ring_type_ =
 								RingType::Left;
-						} else if (is_at_right(corner)) {
+							} else if (is_at_right(
+									   corner)) {
 #ifdef SMTC2GO_DEBUG
 							LOG_DEBUG(
 								"发现右圆环，凹点(%d,%d)",
@@ -430,12 +406,12 @@ class ring {
 								Discovered;
 							ring_type_ =
 								RingType::Right;
-						} else {
-							ring_status_ =
-								RingStatus::
+							} else {
+								ring_status_ = RingStatus::
 									NotFound;
-							ring_type_ =
-								RingType::None;
+								ring_type_ =
+									RingType::None;
+							}
 						}
 					}
 				}
@@ -611,6 +587,16 @@ class ring {
 							 *it,
 							 cv::Scalar(0, 0, 255),
 							 2);
+						if ((it->y) >
+						    img_height * 4 / 5) {
+							LOG_INFO(
+								"已出环: 凹点(%d,%d)",
+								it->x, it->y);
+							ring_status_ =
+								RingStatus::
+									NotFound;
+							break;
+						}
 #ifdef SMTC2GO_DEBUG
 						LOG_DEBUG(
 							"Exiting: 左起点(%d,%d) -> 凹点(%d,%d)",
