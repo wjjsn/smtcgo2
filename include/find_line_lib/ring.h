@@ -95,6 +95,8 @@ class ring {
 #ifdef SMTC2GO_DEBUG_IMSHOW
 		cv::namedWindow("Result", cv::WINDOW_NORMAL);
 		cv::resizeWindow("Result", 400, 300);
+		cv::namedWindow("Debug", cv::WINDOW_NORMAL);
+		cv::resizeWindow("Debug", 400, 300);
 #endif // SMTC2GO_DEBUG_IMSHOW
 #endif
 #ifdef SMTC2GO_DEBUG
@@ -152,7 +154,8 @@ class ring {
 					 cv::RETR_TREE,
 					 cv::CHAIN_APPROX_SIMPLE);
 		}
-		cv::Mat result_img = resized.clone();
+		cv::Mat result_img = dilated.clone();
+		cv::Mat debug_img = resized.clone();
 		int best_contour_index = -1;
 		{
 			TRACE_SCOPE("找到对的轮廓");
@@ -199,6 +202,17 @@ class ring {
 			}
 		}
 
+		// 轮廓外区域置黑
+		if (best_contour_index >= 0) {
+			cv::Mat contour_mask = cv::Mat::zeros(
+				img_height, img_width, CV_8U);
+			cv::drawContours(contour_mask, contours,
+					 best_contour_index,
+					 cv::Scalar(255), cv::FILLED);
+			cv::bitwise_and(result_img, contour_mask,
+					result_img);
+		}
+
 		std::vector<cv::Point> concavePoints;
 		std::vector<cv::Point> concavePoints_will_not_be_used;
 		{
@@ -221,21 +235,21 @@ class ring {
 							.size(),
 						approx.size());
 					cv::drawContours(
-						result_img,
+						debug_img,
 						std::vector<
 							std::vector<cv::Point> >{
 							approx },
 						0, cv::Scalar(0, 255, 0), 2);
-					for (auto i = 0; i < approx.size();
-					     ++i) {
-						cv::putText(
-							result_img,
-							std::to_string(i),
-							approx.at(i),
-							cv::FONT_HERSHEY_SIMPLEX,
-							0.4,
-							cv::Scalar(0, 0, 255));
-					}
+					// for (auto i = 0; i < approx.size();
+					//      ++i) {
+					// 	cv::putText(
+					// 		debug_img,
+					// 		std::to_string(i),
+					// 		approx.at(i),
+					// 		cv::FONT_HERSHEY_SIMPLEX,
+					// 		0.4,
+					// 		cv::Scalar(0, 0, 255));
+					// }
 #endif
 				} else if (!hull.empty()) {
 					std::vector<cv::Vec4i> defects;
@@ -309,7 +323,7 @@ class ring {
 					// 		.size(),
 					// 	approx.size());
 					cv::drawContours(
-						result_img,
+						debug_img,
 						std::vector<
 							std::vector<cv::Point> >{
 							approx },
@@ -317,7 +331,7 @@ class ring {
 					for (auto point :
 					     concavePoints // 这个点就是要找的角点
 					) {
-						cv::circle(result_img, point, 3,
+						cv::circle(debug_img, point, 3,
 							   cv::Scalar(0xA5,
 								      0x2A,
 								      0x2A),
@@ -326,7 +340,7 @@ class ring {
 					for (auto point :
 					     concavePoints_will_not_be_used // 这是被过滤掉的角点
 					) {
-						cv::circle(result_img, point, 3,
+						cv::circle(debug_img, point, 3,
 							   cv::Scalar(0xA5,
 								      0x00,
 								      0xFF),
@@ -335,7 +349,7 @@ class ring {
 					for (auto i = 0; i < approx.size();
 					     ++i) {
 						cv::putText(
-							result_img,
+							debug_img,
 							std::to_string(i),
 							approx.at(i),
 							cv::FONT_HERSHEY_SIMPLEX,
@@ -358,6 +372,9 @@ class ring {
 		// 辅助 lambda：判断凹点位置
 		auto is_at_bottom = [](cv::Point p) { // 是下面的
 			return p.y > img_height * 2 / 3;
+		};
+		auto is_at_up = [](cv::Point p) { // 是下面的
+			return p.y < img_height * 2 / 3;
 		};
 		auto is_at_left = [](cv::Point p) { return p.x < img_width / 2; }; // 是左边的
 		auto is_at_right = [](cv::Point p) { return p.x > img_width / 2; }; // 是右边的
@@ -455,7 +472,7 @@ class ring {
 							 cv::Point(right_pt.x,
 								   right_pt.y),
 							 *nearest,
-							 cv::Scalar(0, 0, 255),
+							 cv::Scalar(0),
 							 2);
 #ifdef SMTC2GO_DEBUG
 						LOG_DEBUG(
@@ -469,7 +486,7 @@ class ring {
 							 cv::Point(left_pt.x,
 								   left_pt.y),
 							 *nearest,
-							 cv::Scalar(0, 0, 255),
+							 cv::Scalar(0),
 							 2);
 #ifdef SMTC2GO_DEBUG
 						LOG_DEBUG(
@@ -516,7 +533,7 @@ class ring {
 						// 连接左上角点和凹点
 						cv::line(result_img, *top_left,
 							 *nearest_concave,
-							 cv::Scalar(0, 0, 255), 2);
+							 cv::Scalar(0), 2);
 #ifdef SMTC2GO_DEBUG
 						LOG_DEBUG(
 							"AboutToExit: 左上角(%d,%d) -> 凹点(%d,%d)",
@@ -540,7 +557,7 @@ class ring {
 						// 连接右上角点和凹点
 						cv::line(result_img, *top_right,
 							 *nearest_concave,
-							 cv::Scalar(0, 0, 255), 2);
+							 cv::Scalar(0), 2);
 #ifdef SMTC2GO_DEBUG
 						LOG_DEBUG(
 							"AboutToExit: 右上角(%d,%d) -> 凹点(%d,%d)",
@@ -590,8 +607,8 @@ class ring {
 					cv::line(result_img,
 						 cv::Point(cx - dx, cy - dy),
 						 cv::Point(cx + dx, cy + dy),
-						 cv::Scalar(0, 0, 255), 2);
-					cv::circle(result_img,
+						 cv::Scalar(0), 2);
+					cv::circle(debug_img,
 						   cv::Point(cx, cy), 1,
 						   cv::Scalar(255, 0, 0));
 #ifdef SMTC2GO_DEBUG
@@ -627,7 +644,7 @@ class ring {
 							 cv::Point(side_pt.x,
 								   side_pt.y),
 							 *it,
-							 cv::Scalar(0, 0, 255),
+							 cv::Scalar(0),
 							 2);
 						if ((it->y) >
 						    img_height * 4 / 5) {
@@ -657,6 +674,9 @@ class ring {
 		cv::Mat result_display;
 		cv::resize(result_img, result_display, cv::Size(400, 300));
 		cv::imshow("Result", result_display);
+		cv::Mat debug_display;
+		cv::resize(debug_img, debug_display, cv::Size(400, 300));
+		cv::imshow("Debug", debug_display);
 #endif
 		return result_img;
 	}
