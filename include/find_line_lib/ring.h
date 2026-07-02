@@ -364,6 +364,9 @@ class ring {
 		auto find_nearest_top_left = [](cv::Point a, cv::Point b) { // 找最近左上角点
 			return (a.y + a.x) < (b.y + b.x);
 		};
+		auto find_nearest_top_right = [](cv::Point a, cv::Point b) { // 找最近右上角点
+			return (a.y + (img_width - a.x)) < (b.y + (img_width - b.x));
+		};
 		auto find_topmost = [](cv::Point a, cv::Point b) { // 找最上方点
 			return a.y < b.y;
 		};
@@ -446,7 +449,8 @@ class ring {
 						find_topmost);
 
 					if (nearest != concavePoints.end()) {
-						// 连接右起始点和凹点
+					if (ring_type_ == RingType::Left) {
+						// 左环：连接右起始点和凹点
 						cv::line(result_img,
 							 cv::Point(right_pt.x,
 								   right_pt.y),
@@ -459,7 +463,22 @@ class ring {
 							right_pt.x, right_pt.y,
 							nearest->x, nearest->y);
 #endif
+					} else if (ring_type_ == RingType::Right) {
+						// 右环：连接左起始点和凹点
+						cv::line(result_img,
+							 cv::Point(left_pt.x,
+								   left_pt.y),
+							 *nearest,
+							 cv::Scalar(0, 0, 255),
+							 2);
+#ifdef SMTC2GO_DEBUG
+						LOG_DEBUG(
+							"Discovered: 左起点(%d,%d) -> 凹点(%d,%d)",
+							left_pt.x, left_pt.y,
+							nearest->x, nearest->y);
+#endif
 					}
+				}
 				}
 			} else {
 				ring_status_ = RingStatus::PrepareExit;
@@ -476,39 +495,60 @@ class ring {
 		} break;
 
 		case RingStatus::AboutToExit: {
-			/*
-			以左圆环为例
-			1. 找到轮廓的左上角点
-			2. 连接角点和左上角点
-			*/
 			if (!(concavePoints.empty())) {
 				auto best_contour =
 					contours.at(best_contour_index);
 
 				if (!best_contour.empty()) {
-					// 找轮廓上最靠近左上的点
-					auto top_left = std::min_element(
-						best_contour.begin(),
-						best_contour.end(),
-						find_nearest_top_left);
+					if (ring_type_ == RingType::Left) {
+						// 左环：找轮廓上最靠近左上的点
+						auto top_left = std::min_element(
+							best_contour.begin(),
+							best_contour.end(),
+							find_nearest_top_left);
 
-					// 找最靠近左上的凹点
-					auto nearest_concave = std::min_element(
-						concavePoints.begin(),
-						concavePoints.end(),
-						find_nearest_top_left);
+						// 找最靠近左上的凹点
+						auto nearest_concave = std::min_element(
+							concavePoints.begin(),
+							concavePoints.end(),
+							find_nearest_top_left);
 
-					// 连接左上角点和凹点
-					cv::line(result_img, *top_left,
-						 *nearest_concave,
-						 cv::Scalar(0, 0, 255), 2);
+						// 连接左上角点和凹点
+						cv::line(result_img, *top_left,
+							 *nearest_concave,
+							 cv::Scalar(0, 0, 255), 2);
 #ifdef SMTC2GO_DEBUG
-					LOG_DEBUG(
-						"AboutToExit: 左上角(%d,%d) -> 凹点(%d,%d)",
-						top_left->x, top_left->y,
-						nearest_concave->x,
-						nearest_concave->y);
+						LOG_DEBUG(
+							"AboutToExit: 左上角(%d,%d) -> 凹点(%d,%d)",
+							top_left->x, top_left->y,
+							nearest_concave->x,
+							nearest_concave->y);
 #endif
+					} else if (ring_type_ == RingType::Right) {
+						// 右环：找轮廓上最靠近右上的点
+						auto top_right = std::min_element(
+							best_contour.begin(),
+							best_contour.end(),
+							find_nearest_top_right);
+
+						// 找最靠近右上的凹点
+						auto nearest_concave = std::min_element(
+							concavePoints.begin(),
+							concavePoints.end(),
+							find_nearest_top_right);
+
+						// 连接右上角点和凹点
+						cv::line(result_img, *top_right,
+							 *nearest_concave,
+							 cv::Scalar(0, 0, 255), 2);
+#ifdef SMTC2GO_DEBUG
+						LOG_DEBUG(
+							"AboutToExit: 右上角(%d,%d) -> 凹点(%d,%d)",
+							top_right->x, top_right->y,
+							nearest_concave->x,
+							nearest_concave->y);
+#endif
+					}
 				}
 			} else {
 				ring_status_ = RingStatus::Exiting;
@@ -536,8 +576,8 @@ class ring {
 						static_cast<int>(m.m01 / m.m00);
 
 					// 画一条指定斜率的线穿过质心
-					// 以质心为中心，向对角延伸
-					float slope = 0.5f; // 斜率
+					float slope = (ring_type_ == RingType::Left)
+						      ? 0.5f : -0.5f;
 					int half = std::max(bbox.width,
 							    bbox.height);
 					// 方向向量 (1, slope)，归一化后乘以 half/2
@@ -556,21 +596,22 @@ class ring {
 						   cv::Scalar(255, 0, 0));
 #ifdef SMTC2GO_DEBUG
 					LOG_DEBUG(
-						"Exiting: 画对角线穿过中心(%d,%d)",
-						cx, cy);
+						"Exiting: 画对角线穿过中心(%d,%d) 斜率%.1f",
+						cx, cy, slope);
 #endif
 				}
 			} else {
-				// 在左边中下方找到凹点
+				// 根据环类型在对应侧中下方找凹点
+				bool is_left_ring = (ring_type_ == RingType::Left);
 				auto it = std::find_if(
 					concavePoints.begin(),
 					concavePoints.end(), [&](cv::Point p) {
-						return is_at_left(p) &&
+						return (is_left_ring ? is_at_left(p) : is_at_right(p)) &&
 						       p.y > img_height / 4;
 					});
 
 				if (it != concavePoints.end()) {
-					// 用左起始点连接
+					// 用对应侧起始点连接
 					Point sp(img_width / 2, img_height - 1);
 					auto start_result = get_start_point(
 						full_binary, img_width,
@@ -579,11 +620,12 @@ class ring {
 						img_height - 1, "horizontal");
 
 					if (start_result != nullptr) {
-						auto &left_pt = std::get<0>(
-							*start_result);
+						auto &side_pt = is_left_ring
+							? std::get<0>(*start_result)
+							: std::get<1>(*start_result);
 						cv::line(result_img,
-							 cv::Point(left_pt.x,
-								   left_pt.y),
+							 cv::Point(side_pt.x,
+								   side_pt.y),
 							 *it,
 							 cv::Scalar(0, 0, 255),
 							 2);
@@ -599,8 +641,9 @@ class ring {
 						}
 #ifdef SMTC2GO_DEBUG
 						LOG_DEBUG(
-							"Exiting: 左起点(%d,%d) -> 凹点(%d,%d)",
-							left_pt.x, left_pt.y,
+							"Exiting: %s起点(%d,%d) -> 凹点(%d,%d)",
+							is_left_ring ? "左" : "右",
+							side_pt.x, side_pt.y,
 							it->x, it->y);
 #endif
 					}
