@@ -14,8 +14,7 @@
 #pragma once
 
 #include "common.h"
-#include "find_line_lib/imgproc.hpp"
-#include "road.hpp"
+#include "find_line_lib/tools.hpp"
 #include <algorithm>
 #include <filesystem>
 #include <opencv2/core/types.hpp>
@@ -80,7 +79,7 @@ class ring {
 	RingStatus ring_status_;
 	RingType ring_type_;
 	int frame_number_ = 0;
-	imgproc imgprocsser_{ img_width, img_height };
+	find_line_lib::tools tools_;
 
 	bool
 	try_discover_ring(const uint8_t *bin_img,
@@ -161,8 +160,8 @@ class ring {
 		int best_contour_index = -1;
 		{
 			TRACE_SCOPE("找到对的轮廓");
-			best_contour_index = imgprocsser_.find_best_contour(
-				dilated, contours);
+			best_contour_index =
+				tools_.find_best_contour(dilated, contours);
 		}
 
 		// 轮廓外区域置黑
@@ -405,7 +404,7 @@ class ring {
 				// 获取左右起始点
 				start_point sp;
 				auto start_result =
-					road::get_start_point(dilated, sp);
+					tools_.get_start_point(dilated, sp);
 				if (start_result) {
 					auto left_pt = sp.left;
 					auto right_pt = sp.right;
@@ -582,8 +581,8 @@ class ring {
 					// 用对应侧起始点连接
 					start_point sp;
 					auto start_result =
-						road::get_start_point(dilated,
-								      sp);
+						tools_.get_start_point(dilated,
+								       sp);
 					if (start_result) {
 						auto &side_pt =
 							is_left_ring ? sp.left :
@@ -627,8 +626,8 @@ class ring {
 		}
 		{
 			TRACE_SCOPE("再次找到对的轮廓");
-			best_contour_index = imgprocsser_.find_best_contour(
-				dilated, contours);
+			best_contour_index =
+				tools_.find_best_contour(dilated, contours);
 		}
 		// 轮廓外区域置黑
 		if (best_contour_index >= 0) {

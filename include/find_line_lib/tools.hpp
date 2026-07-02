@@ -1,24 +1,54 @@
 #pragma once
 #include "opencv2/opencv.hpp"
-#include <opencv2/core/mat.hpp>
-#include <opencv2/core/types.hpp>
-#include <vector>
 namespace find_line_lib
 {
-
 struct start_point {
 	cv::Point left;
 	cv::Point right;
 };
-
-class road {
-	/*
-    默认从底部的中间开始找
-    向左向右找白点，如果一整行找完都没有白的，则向上一行继续找
-    如果找的白的了，则找出这段白线的中点，作为下一行的起点
-    如果下一行是全黑，则结束，否则循环
-    */
+class tools {
     public:
+	auto find_best_contour(cv::Mat &bin_img,
+			       std::vector<std::vector<cv::Point> > &contours)
+	{
+		int img_width_ = bin_img.cols;
+		int img_height_ = bin_img.rows;
+		int ref_center_x = bin_img.cols / 2;
+		int ref_center_y = bin_img.rows;
+		bool has_ref_point = false;
+		start_point sp;
+		auto start_result = get_start_point(bin_img, sp);
+		if (start_result) {
+			ref_center_x = (sp.left.x + sp.right.x) / 2;
+			ref_center_y = (sp.left.y + sp.right.y) / 2;
+			has_ref_point = true;
+		}
+
+		// 筛选最底部居中轮廓
+		int best_dist = img_width_;
+		int best_contour_index = -1;
+		for (size_t i = 0; i < contours.size(); ++i) {
+			double area = cv::contourArea(contours[i]);
+			cv::Rect bounding = cv::boundingRect(contours[i]);
+			int bottom_y = bounding.y + bounding.height;
+			if (bottom_y < img_height_ - 2)
+				continue;
+			// 参考点必须在轮廓内
+			if (has_ref_point) {
+				cv::Point ref_pt(ref_center_x, ref_center_y);
+				if (cv::pointPolygonTest(contours[i], ref_pt,
+							 false) < 0)
+					continue;
+			}
+			int contour_center_x = bounding.x + bounding.width / 2;
+			int dist = std::abs(contour_center_x - ref_center_x);
+			if (dist < best_dist) {
+				best_dist = dist;
+				best_contour_index = static_cast<int>(i);
+			}
+		}
+		return best_contour_index;
+	}
 	static auto find_center_line(cv::Mat &bin_img, int start_width = -1,
 				     int start_height = -1)
 	{

@@ -6,10 +6,10 @@
 
 #include "find_line_lib/calculate_wheel_speeds.h"
 #include "find_line_lib/ring.h"
-#include "find_line_lib/road.hpp"
+
 #include "find_line_lib/thinning.h"
 find_line_lib::ring ring;
-find_line_lib::road road;
+find_line_lib::tools tools;
 int main()
 {
 	std::cout << "OpenCV loaded OK" << std::endl;
