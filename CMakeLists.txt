@@ -23,6 +23,7 @@ add_library(find_line_lib STATIC
     src/find_line_lib/check_roadblock.cpp
     src/find_line_lib/calculate_wheel_speeds.cpp
     src/find_line_lib/skeleton.cpp
+    src/find_line_lib/thinning.cpp
 )
 
 target_compile_definitions(find_line_lib 
