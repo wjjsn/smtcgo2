@@ -203,5 +203,69 @@ class tools {
 		}
 		return false;
 	}
+	auto find_concave_point(
+		std::vector<cv::Point> &approx,
+		std::vector<cv::Point> &output_concavePoints,
+		std::vector<cv::Point> &output_concavePoints_will_not_be_used,
+		int angle_threshold = 150)
+	{
+		// std::vector<cv::Point> approx;
+		// cv::approxPolyDP(contour, approx, approxPolyDP_epsilon,
+		// 		 true);
+
+		std::vector<int> hull; // 计算凸点
+		cv::convexHull(approx, hull, false, false);
+		if (!hull.empty() && hull.size() != approx.size()) {
+			std::vector<cv::Vec4i> defects;
+			cv::convexityDefects(approx, hull, defects);
+			for (const auto &defect : defects) {
+				// cv::Vec4i 的结构：
+				// [0] = 缺陷起始点的索引
+				// [1] = 缺陷结束点的索引
+				// [2] = 缺陷最深点（凹点）的索引
+				// [3] = 凹点到凸包外边的近似距离（固定扩大了256倍，实际距离需除以
+				// 256.0）
+
+				int depth = defect[3] / 256;
+
+				// 过滤掉微小的噪声起伏，只有当凹陷深度大于一定阈值时才认为是凹点
+				if (depth > 5) {
+					int farthestIdx = defect
+						[2]; // 凹点在原 contour 中的索引
+					// 计算前一个点、当前点、后一个点组成的角度
+					int n = static_cast<int>(approx.size());
+					cv::Point prev =
+						approx[(farthestIdx - 1 + n) %
+						       n];
+					cv::Point curr = approx[farthestIdx];
+					cv::Point next =
+						approx[(farthestIdx + 1) % n];
+					cv::Point v1 = prev - curr;
+					cv::Point v2 = next - curr;
+					double dot = v1.x * v2.x + v1.y * v2.y;
+					double len1 = std::sqrt(v1.x * v1.x +
+								v1.y * v1.y);
+					double len2 = std::sqrt(v2.x * v2.x +
+								v2.y * v2.y);
+					double cos_angle = dot / (len1 * len2);
+					cos_angle = std::clamp(cos_angle, -1.0,
+							       1.0);
+					double angle = std::acos(cos_angle) *
+						       180.0 / CV_PI;
+					//过滤掉角度过大的点，避免误判
+					if (angle > angle_threshold) {
+						output_concavePoints_will_not_be_used
+							.push_back(curr);
+					} else {
+						output_concavePoints.push_back(
+							curr);
+					}
+				}
+			}
+			return true; // 找到凹点，返回 true
+		} else {
+			return false; // 没有凹点
+		}
+	}
 };
 }

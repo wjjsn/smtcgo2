@@ -181,146 +181,34 @@ class ring {
 			TRACE_SCOPE("找到凹点");
 			if (best_contour_index >= 0) {
 				std::vector<cv::Point> approx;
-				cv::approxPolyDP(
-					contours.at(best_contour_index), approx,
-					2, true); //
+				cv::approxPolyDP(contours[best_contour_index], approx, 2, true);
 
-				std::vector<int> hull; // 计算凸点
-				cv::convexHull(approx, hull, false, false);
-
-				if (hull.size() == approx.size()) {
-					// 纯凸出的形状
+				auto concave_point_result =
+					tools_.find_concave_point(
+						approx, concavePoints,
+						concavePoints_will_not_be_used);
 #ifdef SMTC2GO_DEBUG
-					LOG_DEBUG(
-						"原%d个点，化简后%d个点",
-						contours.at(best_contour_index)
-							.size(),
-						approx.size());
-					cv::drawContours(
-						debug_img,
-						std::vector<
-							std::vector<cv::Point> >{
-							approx },
-						0, cv::Scalar(0, 255, 0), 2);
-					// for (auto i = 0; i < approx.size();
-					//      ++i) {
-					// 	cv::putText(
-					// 		debug_img,
-					// 		std::to_string(i),
-					// 		approx.at(i),
-					// 		cv::FONT_HERSHEY_SIMPLEX,
-					// 		0.4,
-					// 		cv::Scalar(0, 0, 255));
-					// }
-#endif
-				} else if (!hull.empty()) {
-					std::vector<cv::Vec4i> defects;
-					cv::convexityDefects(approx, hull,
-							     defects);
-					for (const auto &defect : defects) {
-						// cv::Vec4i 的结构：
-						// [0] = 缺陷起始点的索引
-						// [1] = 缺陷结束点的索引
-						// [2] = 缺陷最深点（凹点）的索引
-						// [3] = 凹点到凸包外边的近似距离（固定扩大了256倍，实际距离需除以
-						// 256.0）
-
-						int depth = defect[3] / 256;
-
-						// 过滤掉微小的噪声起伏，只有当凹陷深度大于一定阈值时才认为是凹点
-						if (depth > 5) {
-							int farthestIdx = defect
-								[2]; // 凹点在原 contour 中的索引
-							// 计算前一个点、当前点、后一个点组成的角度
-							int n = static_cast<int>(
-								approx.size());
-							cv::Point prev = approx
-								[(farthestIdx -
-								  1 + n) %
-								 n];
-							cv::Point curr = approx
-								[farthestIdx];
-							cv::Point next = approx
-								[(farthestIdx +
-								  1) %
-								 n];
-							cv::Point v1 =
-								prev - curr;
-							cv::Point v2 =
-								next - curr;
-							double dot =
-								v1.x * v2.x +
-								v1.y * v2.y;
-							double len1 = std::sqrt(
-								v1.x * v1.x +
-								v1.y * v1.y);
-							double len2 = std::sqrt(
-								v2.x * v2.x +
-								v2.y * v2.y);
-							double cos_angle =
-								dot /
-								(len1 * len2);
-							cos_angle = std::clamp(
-								cos_angle, -1.0,
-								1.0);
-							double angle =
-								std::acos(
-									cos_angle) *
-								180.0 / CV_PI;
-								//过滤掉角度过大的点，避免误判
-							if (angle > 150.0) {
-								concavePoints_will_not_be_used
-									.push_back(
-										curr);
-							} else {
-								concavePoints.push_back(
-									curr);
-							}
-						}
+				cv::drawContours(
+					debug_img,
+					std::vector<std::vector<cv::Point> >{
+						approx },
+					0, cv::Scalar(0, 255, 0), 2);
+				if (concave_point_result) {
+					for (const auto &p : concavePoints) {
+						cv::circle(debug_img, p, 3,
+							   cv::Scalar(0, 0,
+								      255),
+							   cv::FILLED);
 					}
-#ifdef SMTC2GO_DEBUG
-					// LOG_DEBUG(
-					// 	"原%d个点，化简后%d个点",
-					// 	contours.at(best_contour_index)
-					// 		.size(),
-					// 	approx.size());
-					cv::drawContours(
-						debug_img,
-						std::vector<
-							std::vector<cv::Point> >{
-							approx },
-						0, cv::Scalar(0, 255, 0), 2);
-					for (auto point :
-					     concavePoints // 这个点就是要找的角点
-					) {
-						cv::circle(debug_img, point, 3,
-							   cv::Scalar(0xA5,
-								      0x2A,
-								      0x2A),
-							   1);
+					for (const auto &p :
+					     concavePoints_will_not_be_used) {
+						cv::circle(debug_img, p, 3,
+							   cv::Scalar(255, 0,
+								      0),
+							   cv::FILLED);
 					}
-					for (auto point :
-					     concavePoints_will_not_be_used // 这是被过滤掉的角点
-					) {
-						cv::circle(debug_img, point, 3,
-							   cv::Scalar(0xA5,
-								      0x00,
-								      0xFF),
-							   1);
-					}
-					for (auto i = 0; i < approx.size();
-					     ++i) {
-						cv::putText(
-							debug_img,
-							std::to_string(i),
-							approx.at(i),
-							cv::FONT_HERSHEY_SIMPLEX,
-							0.4,
-							cv::Scalar(0, 0, 255));
-					}
-
-#endif
 				}
+#endif
 			}
 		}
 
